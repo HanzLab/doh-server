@@ -1,10 +1,12 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - "*"
-
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version string used for artifact names and release tag
+        required: true
+        
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -12,7 +14,7 @@ jobs:
     steps:
       - name: Get the version
         id: get_version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        run: echo "VERSION=${{ inputs.version }}" >> $GITHUB_OUTPUT
 
       - uses: actions/checkout@v5
 
@@ -53,6 +55,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           draft: true
+          tag_name: ${{ steps.get_version.outputs.VERSION }}
+          target_commitish: ${{ github.sha }}
           files: |
             target/debian/doh-proxy_${{ steps.get_version.outputs.VERSION }}-1_amd64.deb
             target/debian/doh-proxy_${{ steps.get_version.outputs.VERSION }}-1_arm64.deb
