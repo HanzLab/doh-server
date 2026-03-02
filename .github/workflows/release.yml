@@ -6,7 +6,10 @@ on:
       version:
         description: Version string used for artifact names and release tag
         required: true
-        
+
+permissions:
+  contents: write
+       
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -17,7 +20,9 @@ jobs:
         run: echo "VERSION=${{ inputs.version }}" >> $GITHUB_OUTPUT
 
       - uses: actions/checkout@v5
-
+        with:
+          fetch-depth: 0
+          
       - uses: mlugg/setup-zig@v2
         with:
           version: 0.15.1
@@ -37,6 +42,19 @@ jobs:
 
       - name: Install cargo-zigbuild
         run: cargo install cargo-zigbuild
+
+      - name: Create and push git tag
+        env:
+          VERSION: ${{ steps.get_version.outputs.VERSION }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git rev-parse -q --verify "refs/tags/${VERSION}" >/dev/null; then
+            echo "Tag already exists: ${VERSION}"
+            exit 0
+          fi
+          git tag "${VERSION}" "${GITHUB_SHA}"
+          git push origin "refs/tags/${VERSION}"
 
       - name: Debian packages
         run: |
