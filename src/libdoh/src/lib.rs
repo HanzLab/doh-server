@@ -689,15 +689,24 @@ impl DoH {
         server.pipeline_flush(true);
         let executor = LocalExecutor::new(self.globals.runtime_handle.clone());
         let server = server.with_executor(executor);
-
+        let shutdown = async {
+            let _ = tokio::signal::ctrl_c().await;
+        };
+        
         #[cfg(feature = "tls")]
         {
             if tls_enabled {
-                self.start_with_tls(listener, server).await?;
+                tokio::select! {
+                    res = self.start_with_tls(listener, server) => res,
+                    _ = shutdown => Ok(()),
+                }?;
                 return Ok(());
             }
         }
-        self.start_without_tls(listener, server).await?;
+        tokio::select! {
+            res = self.start_without_tls(listener, server) => res,
+            _ = shutdown => Ok(()),
+        }?;
         Ok(())
     }
 }
