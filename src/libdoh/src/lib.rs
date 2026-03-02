@@ -690,7 +690,25 @@ impl DoH {
         let executor = LocalExecutor::new(self.globals.runtime_handle.clone());
         let server = server.with_executor(executor);
         let shutdown = async {
-            let _ = tokio::signal::ctrl_c().await;
+            #[cfg(unix)]
+            {
+                use tokio::signal::unix::{signal, SignalKind};
+                match signal(SignalKind::terminate()) {
+                    Ok(mut sigterm) => {
+                        tokio::select! {
+                            _ = tokio::signal::ctrl_c() => {}
+                            _ = sigterm.recv() => {}
+                        }
+                    }
+                    Err(_) => {
+                        let _ = tokio::signal::ctrl_c().await;
+                    }
+                }
+            }
+            #[cfg(not(unix))]
+            {
+                let _ = tokio::signal::ctrl_c().await;
+            }
         };
         
         #[cfg(feature = "tls")]
